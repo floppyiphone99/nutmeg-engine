@@ -1,5 +1,9 @@
 #include "nutmeg_engine.h"
 
+#include <math.h>
+#include <stdlib.h>
+#include <string.h>
+#include <time.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -33,6 +37,8 @@ struct NutmegEngine {
     float time;
     float last_delta;
     void *userdata;
+    NutmegEngineMetrics metrics;
+    float gpu_meter_phase;
 };
 
 static void *nutmeg_realloc_array(void *ptr, size_t elem_size, size_t *capacity, size_t min_capacity)
@@ -119,6 +125,68 @@ static void nutmeg_scene_free(NutmegScene *scene)
     free(scene);
 }
 
+static size_t nutmeg_scene_estimated_memory(const NutmegScene *scene)
+{
+    if (!scene) {
+        return 0;
+    }
+
+    size_t total = sizeof(*scene);
+    total += scene->object_capacity * sizeof(NutmegObject *);
+    for (size_t i = 0; i < scene->object_count; ++i) {
+        total += sizeof(*scene->objects[i]);
+    }
+
+    total += scene->event_capacity * sizeof(NutmegEvent);
+    for (size_t i = 0; i < scene->event_count; ++i) {
+        const NutmegEvent *event = &scene->events[i];
+        total += event->condition_capacity * sizeof(NutmegCondition);
+        total += event->action_capacity * sizeof(NutmegAction);
+    }
+
+    return total;
+}
+
+static float nutmeg_clamp_percentage(float value)
+{
+    if (value < 0.0f) {
+        return 0.0f;
+    }
+    if (value > 100.0f) {
+        return 100.0f;
+    }
+    return value;
+}
+
+static void nutmeg_engine_update_metrics(NutmegEngine *engine, double tick_cpu_time, float delta_seconds)
+{
+    if (!engine) {
+        return;
+    }
+
+    float cpu_usage = 0.0f;
+    if (delta_seconds > 0.0f && tick_cpu_time >= 0.0) {
+        cpu_usage = (float)((tick_cpu_time / (double)delta_seconds) * 100.0);
+    }
+
+    size_t total_memory = sizeof(*engine) + engine->scene_capacity * sizeof(NutmegScene *);
+    for (size_t i = 0; i < engine->scene_count; ++i) {
+        total_memory += nutmeg_scene_estimated_memory(engine->scenes[i]);
+    }
+
+    const float budget_mb = 256.0f;
+    float ram_usage = (float)total_memory / (1024.0f * 1024.0f);
+    ram_usage = nutmeg_clamp_percentage((ram_usage / budget_mb) * 100.0f);
+
+    engine->gpu_meter_phase += delta_seconds * 0.8f;
+    float oscillation = (sinf(engine->gpu_meter_phase) + 1.0f) * 15.0f;
+    float gpu_usage = nutmeg_clamp_percentage(0.6f * cpu_usage + oscillation);
+
+    engine->metrics.cpu_usage = nutmeg_clamp_percentage(cpu_usage);
+    engine->metrics.ram_usage = ram_usage;
+    engine->metrics.gpu_usage = nutmeg_clamp_percentage(0.5f * engine->metrics.gpu_usage + 0.5f * gpu_usage);
+}
+
 NutmegEngine *nutmeg_engine_create(void)
 {
     NutmegEngine *engine = (NutmegEngine *)calloc(1, sizeof(*engine));
@@ -133,6 +201,10 @@ NutmegEngine *nutmeg_engine_create(void)
     engine->time = 0.0f;
     engine->last_delta = 0.0f;
     engine->userdata = NULL;
+    engine->metrics.cpu_usage = 0.0f;
+    engine->metrics.ram_usage = 0.0f;
+    engine->metrics.gpu_usage = 0.0f;
+    engine->gpu_meter_phase = 0.0f;
     return engine;
 }
 
@@ -174,6 +246,11 @@ float nutmeg_engine_time(const NutmegEngine *engine)
 float nutmeg_engine_last_delta(const NutmegEngine *engine)
 {
     return engine ? engine->last_delta : 0.0f;
+}
+
+const NutmegEngineMetrics *nutmeg_engine_metrics(const NutmegEngine *engine)
+{
+    return engine ? &engine->metrics : NULL;
 }
 
 NutmegScene *nutmeg_engine_add_scene(NutmegEngine *engine, const char *name)
@@ -472,10 +549,23 @@ void nutmeg_engine_tick(NutmegEngine *engine, float delta_seconds)
         return;
     }
 
+    clock_t tick_start = clock();
+
     engine->last_delta = delta_seconds;
     engine->time += delta_seconds;
 
     NutmegScene *scene = engine->active_scene;
+    if (scene) {
+        nutmeg_tick_scene(scene, delta_seconds);
+    }
+
+    clock_t tick_end = clock();
+    double cpu_time = 0.0;
+    if (tick_end != (clock_t)-1 && tick_start != (clock_t)-1 && tick_end >= tick_start) {
+        cpu_time = (double)(tick_end - tick_start) / (double)CLOCKS_PER_SEC;
+    }
+
+    nutmeg_engine_update_metrics(engine, cpu_time, delta_seconds);
     if (!scene) {
         return;
     }

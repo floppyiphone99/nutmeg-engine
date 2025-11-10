@@ -19,6 +19,8 @@ languages or wrap it with a graphical authoring layer.
 - **Reusable helpers** – common conditions and actions such as timers,
   acceleration, integration and debug printing are bundled in
   `nutmeg_builtin.h`.
+- **Runtime telemetry** – pull CPU, RAM, and GPU style gauges from the engine
+  to feed dashboards or editor overlays.
 - **Pure C99 implementation** – the core is a small, dependency-free static
   library that can be embedded into existing pipelines.
 
@@ -41,6 +43,31 @@ Run the included demo to see the event system in action:
 The example simulates a player ship receiving periodic speed boosts and a
 satellite orbiting with constant acceleration. Output is printed directly to the
 terminal to highlight how events, timers, and actions compose together.
+
+### Nutmeg ImGui Editor (optional)
+
+An ImGui powered editor that mirrors retro Clickteam-style layouts ships with
+the repository. It is disabled by default so the core library can build without
+any third-party dependencies. Enable it through CMake when you have the
+requirements installed:
+
+```bash
+cmake -S . -B build -DNUTMEG_BUILD_EDITOR=ON -DNUTMEG_IMGUI_DIR=/path/to/imgui
+cmake --build build --target nutmeg_editor
+```
+
+If `NUTMEG_IMGUI_DIR` is omitted the build will fetch Dear ImGui from GitHub
+using CMake's `FetchContent`. Providing the variable lets you reuse a local
+checkout or vendored copy.
+
+The editor relies on the following native libraries:
+
+- [GLFW](https://www.glfw.org/) for window and input management.
+- OpenGL 2.1 (or later) for rendering the ImGui draw lists.
+
+When launched, `nutmeg_editor` displays live engine metrics (CPU/RAM/GPU
+gauges), a game viewport, object inspector and command bar laid out to mimic a
+classic Clickteam IDE.
 
 ## Getting Started
 

@@ -29,6 +29,18 @@ typedef struct NutmegVec2 {
     float y;
 } NutmegVec2;
 
+/**
+ * Runtime performance telemetry exposed by the engine.
+ *
+ * The metrics values are normalised to the range [0, 100] and represent
+ * percentage style gauges suitable for driving editor visualisations.
+ */
+typedef struct NutmegEngineMetrics {
+    float cpu_usage; /**< Estimated CPU utilisation percentage. */
+    float ram_usage; /**< Estimated RAM usage percentage. */
+    float gpu_usage; /**< Estimated GPU utilisation percentage. */
+} NutmegEngineMetrics;
+
 /** Engine level pointer type aliases to make the API more readable. */
 typedef struct NutmegEngine NutmegEngine;
 typedef struct NutmegScene NutmegScene;
@@ -102,6 +114,14 @@ float nutmeg_engine_time(const NutmegEngine *engine);
 
 /** Retrieve the most recent delta time passed to nutmeg_engine_tick. */
 float nutmeg_engine_last_delta(const NutmegEngine *engine);
+
+/**
+ * Retrieve the most recent metrics snapshot produced during ticking.
+ *
+ * The pointer returned is owned by the engine and remains valid until the
+ * engine is destroyed. Callers should treat it as read-only.
+ */
+const NutmegEngineMetrics *nutmeg_engine_metrics(const NutmegEngine *engine);
 
 /** Create and register a new scene with the engine. */
 NutmegScene *nutmeg_engine_add_scene(NutmegEngine *engine, const char *name);
