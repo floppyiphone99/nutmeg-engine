@@ -1,5 +1,6 @@
 cmake_minimum_required(VERSION 3.12)
 project(NutmegEngine C CXX)
+project(NutmegEngine C)
 
 set(CMAKE_C_STANDARD 99)
 set(CMAKE_C_STANDARD_REQUIRED ON)
@@ -98,3 +99,5 @@ if(NUTMEG_BUILD_EDITOR)
 
     target_compile_features(nutmeg_editor PRIVATE cxx_std_17)
 endif()
+add_executable(orbit_demo examples/orbit_demo.c)
+target_link_libraries(orbit_demo PRIVATE nutmeg)

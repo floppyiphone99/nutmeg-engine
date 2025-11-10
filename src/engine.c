@@ -4,6 +4,8 @@
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
+#include <stdlib.h>
+#include <string.h>
 
 struct NutmegObject {
     unsigned long id;
@@ -564,6 +566,11 @@ void nutmeg_engine_tick(NutmegEngine *engine, float delta_seconds)
     }
 
     nutmeg_engine_update_metrics(engine, cpu_time, delta_seconds);
+    if (!scene) {
+        return;
+    }
+
+    nutmeg_tick_scene(scene, delta_seconds);
 }
 
 NutmegObject **nutmeg_scene_objects(NutmegScene *scene, size_t *out_count)
